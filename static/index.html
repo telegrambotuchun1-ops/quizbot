@@ -70,7 +70,38 @@
             
             <div class="card prompt-card">
                 <p class="instruction">Quyidagi matnni nusxalab, o'quv faylingiz bilan birga ChatGPT ga yuboring:</p>
-                <div class="prompt-text" id="promptText">Ushbu fayldagi savollarni o'qib chiq. Savollarni aslo qisqartirma yoki o'zgartirma, xuddi qanday bo'lsa shundayligicha qoldir! Agar savollarda tayyor variantlar bo'lsa, ularni va to'g'ri javobni ajratib JSON formatga o'tkaz. Agar faylda faqat savollar bo'lib, variantlar bo'lmasa, har bir savol uchun 4 ta bir-biriga o'xshamaydigan, mantiqiy variant o'ylab top. Lekin diqqat qil: To'g'ri javob sifatida bergan varianting haqiqatdan ham shu savolning aniq, faktik to'g'ri javobi bo'lishi shart! Natijani bot uchun quyidagi strukturali yagona JSON array formatida qaytar: [{"text": "savol", "option_a": "A varianti", "option_b": "B varianti", "option_c": "C varianti", "option_d": "D varianti", "correct_option": "A"}]</div>
+                <div class="prompt-text" id="promptText">Berilgan fayldagi BARCHA savollarni diqqat bilan o‘qib chiq va bittasini ham qoldirma.
+
+Har bir savolni ASLO o‘zgartirma, qisqartirma yoki qayta yozma — matn aynan original holatda saqlansin.
+
+Agar savolda allaqachon javob variantlari (A, B, C, D) berilgan bo‘lsa:
+- Ularni to‘liq va o‘zgartirmasdan ajratib ol
+- To‘g‘ri javobni aniqlab, "correct_option" maydonida ko‘rsat
+
+Agar savolda variantlar berilmagan bo‘lsa:
+- Savolga mos, aniq va faktik jihatdan to‘g‘ri bo‘lgan 4 ta mantiqiy variant (A, B, C, D) yarat
+- Faqat bittasi to‘g‘ri bo‘lsin
+
+MUHIM:
+- To‘g‘ri javob har doim ham "A" bo‘lmasin
+- Uni A, B, C, D orasida TASODIFIY tarzda joylashtir
+
+Natijani faqat JSON formatda qaytar.
+Hech qanday izoh, tushuntirish yoki qo‘shimcha matn yozma.
+
+Format quyidagicha bo‘lishi SHART:
+[
+  {
+    "text": "Savol matni",
+    "option_a": "Variant A",
+    "option_b": "Variant B",
+    "option_c": "Variant C",
+    "option_d": "Variant D",
+    "correct_option": "b"
+  }
+]
+
+Natijani faqat yuklab olish mumkin bo‘lgan `.json` fayl ko‘rinishida taqdim et.}]</div>
                 <button class="btn outline-btn copy-btn" onclick="app.copyPrompt()">Nusxa Olish</button>
             </div>
 
