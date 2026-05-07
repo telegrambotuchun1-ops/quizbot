@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc
+from sqlalchemy import desc, func, delete
 import random
 import string
 import os
@@ -12,9 +12,21 @@ from database import get_db, engine, Base
 import models
 import schemas
 
-ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID", "")
+ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID", "").strip()
 
 app = FastAPI()
+
+@app.get("/loaderio-{token}.txt", response_class=PlainTextResponse)
+async def loaderio_verify_txt(token: str):
+    return f"loaderio-{token}"
+
+@app.get("/loaderio-{token}/", response_class=PlainTextResponse)
+async def loaderio_verify_slash(token: str):
+    return f"loaderio-{token}"
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "message": "Server is running smoothly!"}
 
 @app.on_event("startup")
 async def startup():
@@ -138,21 +150,28 @@ async def get_results(telegram_id: int, db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/admin/check/{telegram_id}")
 async def check_admin(telegram_id: str):
-    is_admin = (telegram_id == ADMIN_TELEGRAM_ID)
+    is_admin = (telegram_id.strip() == ADMIN_TELEGRAM_ID)
     return {"is_admin": is_admin}
 
 @app.get("/api/admin/quizzes")
 async def get_admin_quizzes(telegram_id: str, db: AsyncSession = Depends(get_db)):
-    if telegram_id != ADMIN_TELEGRAM_ID:
+    if telegram_id.strip() != ADMIN_TELEGRAM_ID:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    quizzes_res = await db.execute(select(models.Quiz).order_by(desc(models.Quiz.created_at)))
-    quizzes = quizzes_res.scalars().all()
+    # Yaratuvchi ma'lumotlari bilan birga yuklash
+    stmt = select(models.Quiz, models.User).join(models.User, models.Quiz.creator_id == models.User.id).order_by(desc(models.Quiz.created_at))
+    quizzes_res = await db.execute(stmt)
     
     result_data = []
-    for q in quizzes:
-        stmt = select(models.Result, models.User).join(models.User).where(models.Result.quiz_id == q.id)
-        res = await db.execute(stmt)
+    for q, creator in quizzes_res.all():
+        # Savollar sonini hisoblash
+        count_stmt = select(func.count(models.Question.id)).where(models.Question.quiz_id == q.id)
+        count_res = await db.execute(count_stmt)
+        total_questions = count_res.scalar()
+
+        # Ishtirokchilarni olish
+        part_stmt = select(models.Result, models.User).join(models.User).where(models.Result.quiz_id == q.id)
+        res = await db.execute(part_stmt)
         
         participants = []
         for r, u in res.all():
@@ -168,10 +187,28 @@ async def get_admin_quizzes(telegram_id: str, db: AsyncSession = Depends(get_db)
         result_data.append({
             "code": q.code,
             "created_at": q.created_at.strftime("%Y-%m-%d %H:%M"),
+            "creator_name": creator.first_name,
+            "creator_username": creator.username,
+            "total_questions": total_questions,
             "participants": participants
         })
         
     return result_data
+
+@app.delete("/api/admin/quiz/{code}")
+async def delete_quiz(code: str, telegram_id: str, db: AsyncSession = Depends(get_db)):
+    if telegram_id.strip() != ADMIN_TELEGRAM_ID:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    stmt = select(models.Quiz).where(models.Quiz.code == code)
+    res = await db.execute(stmt)
+    quiz = res.scalars().first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    await db.delete(quiz)
+    await db.commit()
+    return {"status": "success"}
 
 os.makedirs("static", exist_ok=True)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
