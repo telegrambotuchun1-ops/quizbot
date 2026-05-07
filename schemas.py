@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
-class QuestionBase(BaseModel):
+class QuestionCreate(BaseModel):
     text: str
     option_a: str
     option_b: str
@@ -10,9 +10,9 @@ class QuestionBase(BaseModel):
     correct_option: str
 
 class QuizCreate(BaseModel):
-    timer_per_question: int
-    questions: List[QuestionBase]
     telegram_id: int
+    timer_per_question: int
+    questions: List[QuestionCreate]
 
 class SubmitResult(BaseModel):
     telegram_id: int

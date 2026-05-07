@@ -10,6 +10,9 @@ class User(Base):
     first_name = Column(String, nullable=True)
     username = Column(String, nullable=True)
 
+    created_quizzes = relationship("Quiz", back_populates="creator")
+    results = relationship("Result", back_populates="user")
+
 class Quiz(Base):
     __tablename__ = 'quizzes'
     id = Column(Integer, primary_key=True)
@@ -18,7 +21,9 @@ class Quiz(Base):
     timer_per_question = Column(Integer, default=30)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    creator = relationship("User", back_populates="created_quizzes")
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
+    results = relationship("Result", back_populates="quiz", cascade="all, delete-orphan")
 
 class Question(Base):
     __tablename__ = 'questions'
@@ -42,3 +47,6 @@ class Result(Base):
     correct_count = Column(Integer, default=0)
     incorrect_count = Column(Integer, default=0)
     completed_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="results")
+    quiz = relationship("Quiz", back_populates="results")
