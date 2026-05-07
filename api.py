@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, Body
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc, func, delete
+from sqlalchemy import desc, func
 import random
 import string
 import os
@@ -14,7 +15,13 @@ import schemas
 
 ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID", "").strip()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/loaderio-{token}.txt", response_class=PlainTextResponse)
 async def loaderio_verify_txt(token: str):
@@ -27,11 +34,6 @@ async def loaderio_verify_slash(token: str):
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "message": "Server is running smoothly!"}
-
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
 @app.post("/api/quiz", response_model=dict)
 async def create_quiz(quiz_data: schemas.QuizCreate, db: AsyncSession = Depends(get_db)):
