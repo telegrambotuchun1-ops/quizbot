@@ -69,39 +69,8 @@
             <h3>Yangi Quiz Yaratish</h3>
             
             <div class="card prompt-card">
-                <p class="instruction">Quyidagi matnni nusxalab, o'quv faylingiz bilan birga ChatGPT ga yuboring:</p>
-                <div class="prompt-text" id="promptText">Berilgan fayldagi BARCHA savollarni diqqat bilan o‘qib chiq va bittasini ham qoldirma.
-
-Har bir savolni ASLO o‘zgartirma, qisqartirma yoki qayta yozma — matn aynan original holatda saqlansin.
-
-Agar savolda allaqachon javob variantlari (A, B, C, D) berilgan bo‘lsa:
-- Ularni to‘liq va o‘zgartirmasdan ajratib ol
-- To‘g‘ri javobni aniqlab, "correct_option" maydonida ko‘rsat
-
-Agar savolda variantlar berilmagan bo‘lsa:
-- Savolga mos, aniq va faktik jihatdan to‘g‘ri bo‘lgan 4 ta mantiqiy variant (A, B, C, D) yarat
-- Faqat bittasi to‘g‘ri bo‘lsin
-
-MUHIM:
-- To‘g‘ri javob har doim ham "A" bo‘lmasin
-- Uni A, B, C, D orasida TASODIFIY tarzda joylashtir
-
-Natijani faqat JSON formatda qaytar.
-Hech qanday izoh, tushuntirish yoki qo‘shimcha matn yozma.
-
-Format quyidagicha bo‘lishi SHART:
-[
-  {
-    "text": "Savol matni",
-    "option_a": "Variant A",
-    "option_b": "Variant B",
-    "option_c": "Variant C",
-    "option_d": "Variant D",
-    "correct_option": "b"
-  }
-]
-
-Natijani faqat yuklab olish mumkin bo‘lgan `.json` fayl ko‘rinishida taqdim et.}]</div>
+                <p class="instruction" style="color:#475569;">Quyidagi matnni nusxalab, o'quv faylingiz bilan birga ChatGPT ga yuboring:</p>
+                <div class="prompt-text" id="promptText" style="color:var(--text-color); border: 1px solid var(--border-color); background: rgba(255,255,255,0.5);">Ushbu fayldagi BARCHA savollarni o'qib chiq, bittasini ham qoldirma. Savollarni aslo qisqartirma yoki o'zgartirma. Agar savollarda tayyor variantlar bo'lsa, ularni va to'g'ri javobni ajratib JSON formatga o'tkaz. Agar variantlar bo'lmasa, o'zing har bir savol uchun aniq, faktik to'g'ri keladigan 4 ta mantiqiy variant o'ylab top. MUHIM: To'g'ri javobni doim 'A' varianti qilib qo'yma, uni A, B, C, D orasida tasodifiy (random) qilib joylashtir! Menga to'liq ro'yxatni faqatgina yuklab olish mumkin bo'lgan '.json' fayl ko'rinishida taqdim et. Format shunday bo'lishi shart: [{"text": "Savol", "option_a": "A", "option_b": "B", "option_c": "C", "option_d": "D", "correct_option": "c"}]</div>
                 <button class="btn outline-btn copy-btn" onclick="app.copyPrompt()">Nusxa Olish</button>
             </div>
 
@@ -111,8 +80,8 @@ Natijani faqat yuklab olish mumkin bo‘lgan `.json` fayl ko‘rinishida taqdim 
                     <input type="number" id="timerInput" value="30" min="5" max="300">
                 </div>
                 <div class="form-group">
-                    <label>ChatGPT bergan JSON ni kiriting:</label>
-                    <textarea id="jsonInput" rows="6" placeholder='[{"text": "...", "option_a": "...", ...}]'></textarea>
+                    <label>ChatGPT bergan faylni tanlang (.json):</label>
+                    <input type="file" id="quizJsonFile" accept=".json">
                 </div>
                 <button class="btn primary-btn" onclick="app.createQuiz()">Quiz Yaratish</button>
             </div>
