@@ -1,8 +1,11 @@
 import os
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+db_path = "./quiz_bot.db"
+if os.path.exists("/data"):
+    db_path = "/data/quiz_bot.db"
 
-DB_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./quiz_bot.db")
+DB_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path}")
 
 if DB_URL.startswith("sqlite"):
     engine = create_async_engine(DB_URL, echo=False)
