@@ -17,6 +17,7 @@ const app = {
     timeLeft: 0,
     currentChunkRange: "Barchasi",
     currentQuestions: [],
+    adminData: [], // Store admin data for easy rendering
 
     init() {
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -55,58 +56,75 @@ const app = {
         }
     },
 
+    async copyCode(code) {
+        try {
+            await navigator.clipboard.writeText(code);
+            tg.showAlert(`Kod nusxalandi: ${code}`);
+        } catch (err) {
+            tg.showAlert("Nusxa olishda xatolik.");
+        }
+    },
+
     async copyPrompt() {
         const text = document.getElementById('promptText').innerText;
         try {
             await navigator.clipboard.writeText(text);
             tg.showAlert("Prompt nusxalandi! ChatGPT ga yuboring.");
         } catch (err) {
-            tg.showAlert("Nusxa olishda xatolik yuz berdi.");
+            tg.showAlert("Nusxa olishda xatolik.");
         }
     },
 
     async createQuiz() {
-        const timer = parseInt(document.getElementById('timerInput').value) || 30;
-        const jsonStr = document.getElementById('jsonInput').value;
-
-        if (!jsonStr) {
-            return tg.showAlert("Iltimos, JSON matnini kiriting!");
-        }
-
-        let questions;
-        try {
-            questions = JSON.parse(jsonStr);
-            if (!Array.isArray(questions)) throw new Error("Not an array");
-        } catch (e) {
-            return tg.showAlert("JSON formati xato! Iltimos, tekshiring.");
-        }
-
-        tg.MainButton.showProgress();
+        const timer = document.getElementById('timerInput').value;
+        const fileInput = document.getElementById('quizJsonFile');
         
-        try {
-            const res = await fetch(`${API_BASE}/quiz`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    timer_per_question: timer,
-                    questions: questions,
-                    telegram_id: this.user.id
-                })
-            });
-
-            const data = await res.json();
-            if (res.ok) {
-                document.getElementById('generatedCode').textContent = data.code;
-                this.showView('quizCreatedView');
-                document.getElementById('jsonInput').value = '';
-            } else {
-                tg.showAlert("Xatolik: " + (data.detail || 'Noma\'lum xato'));
-            }
-        } catch (err) {
-            tg.showAlert("Tarmoq xatosi yuz berdi.");
-        } finally {
-            tg.MainButton.hideProgress();
+        if (!fileInput.files || fileInput.files.length === 0) {
+            tg.showAlert("Iltimos, ChatGPT bergan .json faylni tanlang!");
+            return;
         }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+            const jsonText = e.target.result;
+            let questions = [];
+            
+            try {
+                questions = JSON.parse(jsonText);
+                if (!Array.isArray(questions) || questions.length === 0) {
+                    throw new Error("Fayl ichida savollar ro'yxati yo'q");
+                }
+            } catch (err) {
+                tg.showAlert("Xatolik: Fayl formati noto'g'ri yoki buzilgan JSON!");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/quiz`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telegram_id: this.user.id,
+                        timer_per_question: parseInt(timer),
+                        questions: questions
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('generatedCode').textContent = data.code;
+                    this.showView('quizCreatedView');
+                } else {
+                    tg.showAlert("Server xatosi yuz berdi.");
+                }
+            } catch (err) {
+                tg.showAlert("Tarmoq xatosi yuz berdi.");
+            }
+        };
+
+        reader.readAsText(file);
     },
 
     async joinQuiz() {
@@ -183,10 +201,13 @@ const app = {
         qCard.className = 'question-card';
         qCard.id = `qCard_${this.currentQuestionIndex}`;
         
-        const optionsHtml = ['A', 'B', 'C', 'D'].map(opt => `
+        const keys = ['A', 'B', 'C', 'D'].sort(() => Math.random() - 0.5);
+        const visualLabels = ['A', 'B', 'C', 'D'];
+
+        const optionsHtml = keys.map((opt, idx) => `
             <div class="option" id="opt_${this.currentQuestionIndex}_${opt}" onclick="app.selectOption('${opt}')">
-                <span>${opt}) ${q[`option_${opt.toLowerCase()}`]}</span>
-                <span class="icon-status" id="icon_${this.currentQuestionIndex}_${opt}"></span>
+                <span>${visualLabels[idx]}) ${q[`option_${opt.toLowerCase()}`]}</span>
+                <div class="status-indicator" id="icon_${this.currentQuestionIndex}_${opt}"></div>
             </div>
         `).join('');
 
@@ -198,9 +219,7 @@ const app = {
         `;
         
         container.appendChild(qCard);
-        
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-
         this.startTimer();
     },
 
@@ -238,17 +257,19 @@ const app = {
         
         ['A', 'B', 'C', 'D'].forEach(opt => {
             const el = document.getElementById(`opt_${this.currentQuestionIndex}_${opt}`);
+            const icon = document.getElementById(`icon_${this.currentQuestionIndex}_${opt}`);
             el.classList.add('disabled');
             
             if (opt === correctOpt) {
                 el.classList.add('correct');
-                document.getElementById(`icon_${this.currentQuestionIndex}_${opt}`).textContent = '✅';
+                icon.classList.add('status-success');
+                icon.innerHTML = '✓';
             } else if (opt === selectedOpt && selectedOpt !== correctOpt) {
                 el.classList.add('incorrect-selected');
-                document.getElementById(`icon_${this.currentQuestionIndex}_${opt}`).textContent = '❌';
+                icon.classList.add('status-error');
+                icon.innerHTML = '✕';
             } else {
                 el.classList.add('incorrect');
-                document.getElementById(`icon_${this.currentQuestionIndex}_${opt}`).textContent = '❌';
             }
         });
 
@@ -260,9 +281,10 @@ const app = {
 
         this.currentQuestionIndex++;
         
+        // Speed increased: 400ms instead of 1500ms
         setTimeout(() => {
             this.renderNextQuestion();
-        }, 1500);
+        }, 400);
     },
 
     async finishQuiz() {
@@ -286,7 +308,6 @@ const app = {
 
         document.getElementById('resCorrect').textContent = this.correctCount;
         document.getElementById('resIncorrect').textContent = this.incorrectCount;
-        
         this.showView('quizResultView');
     },
 
@@ -315,7 +336,6 @@ const app = {
                     </div>
                 </div>
             `).join('');
-            
         } catch (err) {
             container.innerHTML = '<p style="text-align:center; color:var(--danger);">Xatolik yuz berdi.</p>';
         }
@@ -323,44 +343,95 @@ const app = {
 
     async loadAdminPanel() {
         const container = document.getElementById('adminContainer');
-        container.innerHTML = '<p style="text-align:center;">Ma\'lumotlar yuklanmoqda...</p>';
+        container.innerHTML = '<p style="text-align:center;">Yuklanmoqda...</p>';
         
         try {
             const res = await fetch(`${API_BASE}/admin/quizzes?telegram_id=${this.user.id}`);
             if (!res.ok) {
-                container.innerHTML = '<p style="text-align:center; color:var(--danger);">Sizda huquq yo\'q yoki xato.</p>';
+                container.innerHTML = '<p style="text-align:center; color:var(--danger);">Sizda huquq yo\'q.</p>';
                 return;
             }
-            const data = await res.json();
-            
-            if (data.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:#94a3b8;">Hali testlar yo\'q.</p>';
-                return;
-            }
-            
-            container.innerHTML = data.map(q => `
-                <div class="admin-card">
-                    <div class="admin-quiz-header">
-                        <span class="result-code">Quiz #${q.code}</span>
-                        <span class="result-date">${q.created_at}</span>
+            this.adminData = await res.json();
+            this.renderAdminQuizzes();
+        } catch (err) {
+            container.innerHTML = '<p style="text-align:center; color:var(--danger);">Xatolik.</p>';
+        }
+    },
+
+    renderAdminQuizzes() {
+        const container = document.getElementById('adminContainer');
+        if (this.adminData.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#94a3b8;">Testlar yo\'q.</p>';
+            return;
+        }
+
+        container.innerHTML = this.adminData.map(q => `
+            <div class="admin-quiz-card" id="quiz_card_${q.code}">
+                <div class="admin-quiz-info" onclick="app.toggleAdminParticipants('${q.code}')">
+                    <div class="admin-code-wrapper">
+                        <span class="admin-code">#${q.code}</span>
+                        <span class="copy-badge" onclick="event.stopPropagation(); app.copyCode('${q.code}')">NUSXA</span>
                     </div>
-                    <div class="participants">
-                        ${q.participants.length === 0 ? '<p style="font-size:0.8rem; color:#94a3b8;">Hali hech kim ishlamagan</p>' : ''}
-                        ${q.participants.map(p => `
-                            <div class="participant-item">
-                                <span class="p-name">${p.first_name} ${p.username ? '(@' + p.username + ')' : ''} <span style="font-size:0.8rem; color:#cbd5e1;">[${p.chunk_range}]</span></span>
-                                <span class="p-score">
-                                    <span style="color:var(--success)">${p.correct}✅</span>
-                                    <span style="color:var(--danger)">${p.incorrect}❌</span>
-                                </span>
-                            </div>
-                        `).join('')}
+                    <div class="admin-creator">
+                        <span>Yaratuvchi: ${q.creator_name}</span>
+                        <span style="font-size:0.75rem; opacity:0.7;">@${q.creator_username || 'noma\'lum'} • ${q.created_at}</span>
+                    </div>
+                </div>
+                <button class="delete-btn" onclick="app.deleteQuiz('${q.code}')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+                <div id="participants_${q.code}" class="participants-list" style="display:none;"></div>
+            </div>
+        `).join('');
+    },
+
+    toggleAdminParticipants(code) {
+        const listDiv = document.getElementById(`participants_${code}`);
+        if (listDiv.style.display === 'block') {
+            listDiv.style.display = 'none';
+            return;
+        }
+
+        // Security code check
+        const pass = prompt("Xonaga kirish uchun kodni kiriting (key: 1213):");
+        if (pass !== "1213") {
+            return tg.showAlert("Noto'g'ri kod!");
+        }
+
+        const quiz = this.adminData.find(q => q.code === code);
+        if (!quiz || quiz.participants.length === 0) {
+            listDiv.innerHTML = '<p style="font-size:0.8rem; color:#94a3b8; text-align:center;">Hali hech kim ishlamagan</p>';
+        } else {
+            listDiv.innerHTML = quiz.participants.map(p => `
+                <div class="participant-row">
+                    <div class="p-details">
+                        <span class="p-name">${p.first_name}</span>
+                        <span class="p-meta">@${p.username || 'n/a'} • ${p.chunk_range}</span>
+                    </div>
+                    <div class="p-score-box">
+                        ${p.correct} / ${p.incorrect} / ${quiz.total_questions}
                     </div>
                 </div>
             `).join('');
-            
+        }
+        listDiv.style.display = 'block';
+    },
+
+    async deleteQuiz(code) {
+        if (!confirm(`Haqiqatdan ham #${code} quizni o'chirmoqchimisiz?`)) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/admin/quiz/${code}?telegram_id=${this.user.id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                this.adminData = this.adminData.filter(q => q.code !== code);
+                this.renderAdminQuizzes();
+            } else {
+                tg.showAlert("O'chirishda xatolik.");
+            }
         } catch (err) {
-            container.innerHTML = '<p style="text-align:center; color:var(--danger);">Xatolik yuz berdi.</p>';
+            tg.showAlert("Tarmoq xatosi.");
         }
     }
 };
